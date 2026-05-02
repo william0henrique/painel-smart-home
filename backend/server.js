@@ -163,7 +163,7 @@ app.use((err, req, res, next) => {
 // =============================================
 // Iniciar servidor
 // =============================================
-app.listen(PORT, () => {
+app.listen(PORT, async () => {
   console.log('');
   console.log('🏠 ================================');
   console.log('   Painel Smart Home - Backend');
@@ -172,31 +172,25 @@ app.listen(PORT, () => {
   console.log(`🌍 Ambiente: ${process.env.NODE_ENV || 'development'}`);
   console.log(`🔑 Tuya API: ${process.env.TUYA_CLIENT_ID ? '✅ Configurada' : '❌ NÃO configurada'}`);
   console.log('');
-});
 
-module.exports = app;
-const bcrypt = require("bcrypt");
-const { getDb } = require("./database/init");
-
-async function criarAdminPadrao() {
+  // 👇 CRIAR ADMIN AUTOMATICO AQUI
   try {
+    const bcrypt = require("bcrypt");
     const db = getDb();
 
-    const existe = db
-      .prepare("SELECT * FROM users WHERE username = ?")
-      .get("william");
+    const user = db.prepare("SELECT * FROM users WHERE username = ?").get("william");
 
-    if (!existe) {
-      const senhaHash = await bcrypt.hash("123456", 10);
+    if (!user) {
+      const hash = await bcrypt.hash("123456", 10);
 
       db.prepare("INSERT INTO users (username, password) VALUES (?, ?)")
-        .run("william", senhaHash);
+        .run("william", hash);
 
-      console.log("Admin criado: william / 123456");
+      console.log("👤 Admin criado: william / 123456");
+    } else {
+      console.log("👤 Admin já existe");
     }
   } catch (err) {
     console.error("Erro ao criar admin:", err.message);
   }
-}
-
-criarAdminPadrao();
+});
