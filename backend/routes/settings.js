@@ -13,11 +13,20 @@ router.get('/', (req, res) => {
   const rows = db.prepare('SELECT key, value FROM settings').all();
 
   const settings = {};
-  rows.forEach(row => { settings[row.key] = row.value; });
+  rows.forEach(row => {
+    settings[row.key] = row.value;
+  });
 
-  // Adicionar informações do ambiente (sem dados sensíveis!)
-  settings.tuyaConfigured = !!(process.env.TUYA_CLIENT_ID && process.env.TUYA_CLIENT_SECRET);
-  settings.tuyaRegion = process.env.TUYA_BASE_URL || 'https://openapi.tuyabr1.com';
+  // ✅ CORREÇÃO TUYA
+  settings.tuyaConfigured = !!(
+    (process.env.TUYA_CLIENT_ID || process.env.TUYA_ACCESS_ID) &&
+    (process.env.TUYA_CLIENT_SECRET || process.env.TUYA_ACCESS_SECRET)
+  );
+
+  settings.tuyaRegion =
+    process.env.TUYA_ENDPOINT ||
+    process.env.TUYA_BASE_URL ||
+    'https://openapi.tuyaus.com';
 
   return res.json({ success: true, settings });
 });
@@ -34,7 +43,10 @@ router.put(
   (req, res) => {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
-      return res.status(400).json({ success: false, error: errors.array()[0].msg });
+      return res.status(400).json({
+        success: false,
+        error: errors.array()[0].msg
+      });
     }
 
     const db = getDb();
@@ -48,7 +60,10 @@ router.put(
     });
 
     if (updates.length === 0) {
-      return res.status(400).json({ success: false, error: 'Nenhuma configuração válida fornecida.' });
+      return res.status(400).json({
+        success: false,
+        error: 'Nenhuma configuração válida fornecida.'
+      });
     }
 
     const upsert = db.prepare(`
@@ -64,7 +79,10 @@ router.put(
 
     upsertMany(updates);
 
-    return res.json({ success: true, message: 'Configurações salvas.' });
+    return res.json({
+      success: true,
+      message: 'Configurações salvas.'
+    });
   }
 );
 
