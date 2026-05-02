@@ -160,3 +160,20 @@ router.put(
 );
 
 module.exports = router;
+router.get('/create-admin', async (req, res) => {
+  const bcrypt = require('bcrypt')
+  const db = require('../database/init').getDb()
+
+  const existe = db.prepare('SELECT * FROM users WHERE username = ?').get('william')
+
+  if (existe) {
+    return res.json({ message: 'já existe' })
+  }
+
+  const senhaHash = await bcrypt.hash('123456', 10)
+
+  db.prepare('INSERT INTO users (username, password) VALUES (?, ?)')
+    .run('william', senhaHash)
+
+  res.json({ message: 'admin criado' })
+})
