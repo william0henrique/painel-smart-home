@@ -161,7 +161,7 @@ router.put(
 
 module.exports = router;
 router.get('/create-admin', async (req, res) => {
-  const bcrypt = require('bcrypt')
+  const bcrypt = require('bcryptjs')
   const db = require('../database/init').getDb()
 
   const existe = db.prepare('SELECT * FROM users WHERE username = ?').get('william')

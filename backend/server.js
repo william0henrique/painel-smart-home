@@ -73,7 +73,7 @@ async function criarAdminPadrao() {
     if (!existe) {
       const senhaHash = await bcrypt.hash('123456', 10);
 
-      db.prepare('INSERT INTO users (username, password) VALUES (?, ?)')
+      db.prepare('INSERT INTO users (username, password_hash) VALUES (?, ?)')
         .run('william', senhaHash);
 
       console.log('👤 Admin criado: william / 123456');
