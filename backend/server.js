@@ -4,53 +4,41 @@ require('dotenv').config();
 const express = require('express');
 const helmet = require('helmet');
 const cors = require('cors');
-const rateLimit = require('express-rate-limit');
 const morgan = require('morgan');
 const cookieParser = require('cookie-parser');
 const path = require('path');
 
-// Inicializar banco de dados
 const { getDb } = require('./database/init');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
 
-// =============================================
-// SEGURANÇA: Headers HTTP com Helmet
-// =============================================
+// Render/Cloudflare proxy
+app.set('trust proxy', 1);
+
+// Segurança
 app.use(helmet({
-  contentSecurityPolicy: {
-    directives: {
-      defaultSrc: ["'self'"],
-      scriptSrc: ["'self'"],
-      styleSrc: ["'self'", "'unsafe-inline'"],
-      imgSrc: ["'self'", 'data:', 'https:'],
-      connectSrc: ["'self'"],
-      fontSrc: ["'self'", 'https:', 'data:'],
-    },
-  },
+  contentSecurityPolicy: false,
   crossOriginEmbedderPolicy: false,
 }));
 
-// =============================================
-// CORS - Apenas origem do frontend
-// =============================================
+// CORS
 const allowedOrigins = [
   process.env.FRONTEND_URL || 'http://localhost:5173',
   'http://localhost:5173',
-  'http://localhost:4173', // Vite preview
+  'http://localhost:4173',
   'http://127.0.0.1:5173',
+  'https://app.insectos.shop',
 ];
 
 app.use(cors({
   origin: (origin, callback) => {
-    // Permitir requests sem origin (ex: Postman em dev) apenas em dev
-    if (!origin && process.env.NODE_ENV !== 'production') {
+    if (!origin) return callback(null, true);
+
+    if (allowedOrigins.includes(origin)) {
       return callback(null, true);
     }
-    if (!origin || allowedOrigins.includes(origin)) {
-      return callback(null, true);
-    }
+
     return callback(new Error('CORS: Origin não permitida'), false);
   },
   credentials: true,
@@ -58,61 +46,53 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization'],
 }));
 
-// =============================================
-// Rate Limiting Global
-// =============================================
-const globalLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutos
-  max: 500,
-  message: { success: false, error: 'Muitas requisições. Tente novamente mais tarde.' },
-  standardHeaders: true,
-  legacyHeaders: false,
-});
-
-// Rate limit mais restrito para autenticação
-const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 20,
-  message: { success: false, error: 'Muitas tentativas de login.' },
-});
-
-app.use(globalLimiter);
-
-// =============================================
-// Middlewares básicos
-// =============================================
-app.use(express.json({ limit: '10kb' })); // Limitar tamanho do body
+// Middlewares
+app.use(express.json({ limit: '10kb' }));
 app.use(express.urlencoded({ extended: false, limit: '10kb' }));
 app.use(cookieParser());
+app.use(morgan(process.env.NODE_ENV === 'production' ? 'combined' : 'dev'));
 
-// Logs (apenas em desenvolvimento)
-if (process.env.NODE_ENV !== 'production') {
-  app.use(morgan('dev'));
-} else {
-  // Em produção, log mais conciso
-  app.use(morgan('combined'));
-}
-
-// =============================================
-// Inicializar banco de dados
-// =============================================
+// Banco
 try {
-  getDb(); // Inicializa e cria tabelas
+  getDb();
   console.log('✅ Banco de dados inicializado');
 } catch (err) {
   console.error('❌ Erro ao inicializar banco:', err.message);
   process.exit(1);
 }
 
-// =============================================
+// Criar admin automático
+async function criarAdminPadrao() {
+  try {
+    const bcrypt = require('bcrypt');
+    const db = getDb();
+
+    const existe = db
+      .prepare('SELECT * FROM users WHERE username = ?')
+      .get('william');
+
+    if (!existe) {
+      const senhaHash = await bcrypt.hash('123456', 10);
+
+      db.prepare('INSERT INTO users (username, password) VALUES (?, ?)')
+        .run('william', senhaHash);
+
+      console.log('👤 Admin criado: william / 123456');
+    } else {
+      console.log('👤 Admin já existe');
+    }
+  } catch (err) {
+    console.error('Erro ao criar admin:', err.message);
+  }
+}
+
 // Rotas da API
-// =============================================
-app.use('/api/auth', authLimiter, require('./routes/auth'));
+app.use('/api/auth', require('./routes/auth'));
 app.use('/api/devices', require('./routes/devices'));
 app.use('/api/automations', require('./routes/automations'));
 app.use('/api/settings', require('./routes/settings'));
 
-// Health check (sem autenticação)
+// Health check
 app.get('/api/health', (req, res) => {
   res.json({
     status: 'ok',
@@ -122,29 +102,26 @@ app.get('/api/health', (req, res) => {
   });
 });
 
-// =============================================
-// Servir frontend em produção
-// =============================================
+// Rota raiz
+app.get('/', (req, res) => {
+  res.json({
+    success: true,
+    message: 'Painel Smart Home API online',
+  });
+});
+
+// Servir frontend só se existir
 if (process.env.NODE_ENV === 'production') {
   const frontendDist = path.join(__dirname, '..', 'frontend', 'dist');
   app.use(express.static(frontendDist));
-  app.get('*', (req, res) => {
-    if (!req.path.startsWith('/api')) {
-      res.sendFile(path.join(frontendDist, 'index.html'));
-    }
-  });
 }
-
-// =============================================
-// Tratamento de erros
-// =============================================
 
 // 404
 app.use((req, res) => {
   res.status(404).json({ success: false, error: 'Rota não encontrada.' });
 });
 
-// Erro global - NUNCA expor detalhes sensíveis
+// Erro global
 app.use((err, req, res, next) => {
   console.error('[ERROR]', err.message);
 
@@ -160,9 +137,7 @@ app.use((err, req, res, next) => {
   });
 });
 
-// =============================================
 // Iniciar servidor
-// =============================================
 app.listen(PORT, async () => {
   console.log('');
   console.log('🏠 ================================');
@@ -170,27 +145,10 @@ app.listen(PORT, async () => {
   console.log('🏠 ================================');
   console.log(`🚀 Servidor: http://localhost:${PORT}`);
   console.log(`🌍 Ambiente: ${process.env.NODE_ENV || 'development'}`);
-  console.log(`🔑 Tuya API: ${process.env.TUYA_CLIENT_ID ? '✅ Configurada' : '❌ NÃO configurada'}`);
+  console.log(`🔑 Tuya API: ${process.env.TUYA_ACCESS_ID ? '✅ Configurada' : '❌ NÃO configurada'}`);
   console.log('');
 
-  // 👇 CRIAR ADMIN AUTOMATICO AQUI
-  try {
-    const bcrypt = require("bcrypt");
-    const db = getDb();
-
-    const user = db.prepare("SELECT * FROM users WHERE username = ?").get("william");
-
-    if (!user) {
-      const hash = await bcrypt.hash("123456", 10);
-
-      db.prepare("INSERT INTO users (username, password) VALUES (?, ?)")
-        .run("william", hash);
-
-      console.log("👤 Admin criado: william / 123456");
-    } else {
-      console.log("👤 Admin já existe");
-    }
-  } catch (err) {
-    console.error("Erro ao criar admin:", err.message);
-  }
+  await criarAdminPadrao();
 });
+
+module.exports = app;
