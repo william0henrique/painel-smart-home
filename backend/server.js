@@ -175,3 +175,28 @@ app.listen(PORT, () => {
 });
 
 module.exports = app;
+const bcrypt = require("bcrypt");
+const { getDb } = require("./database/init");
+
+async function criarAdminPadrao() {
+  try {
+    const db = getDb();
+
+    const existe = db
+      .prepare("SELECT * FROM users WHERE username = ?")
+      .get("william");
+
+    if (!existe) {
+      const senhaHash = await bcrypt.hash("123456", 10);
+
+      db.prepare("INSERT INTO users (username, password) VALUES (?, ?)")
+        .run("william", senhaHash);
+
+      console.log("Admin criado: william / 123456");
+    }
+  } catch (err) {
+    console.error("Erro ao criar admin:", err.message);
+  }
+}
+
+criarAdminPadrao();
