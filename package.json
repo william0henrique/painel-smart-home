@@ -1,0 +1,19 @@
+{
+  "name": "painel-smart-home",
+  "version": "1.0.0",
+  "description": "Painel Smart Home com integração Tuya",
+  "scripts": {
+    "install:all": "cd backend && npm install && cd ../frontend && npm install",
+    "dev:backend": "cd backend && npm run dev",
+    "dev:frontend": "cd frontend && npm run dev",
+    "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
+    "build:frontend": "cd frontend && npm run build",
+    "start:backend": "cd backend && npm start",
+    "start": "cd backend && NODE_ENV=production npm start",
+    "create-admin": "cd backend && npm run create-admin",
+    "setup": "npm run install:all && cd backend && cp .env.example .env"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
+}
