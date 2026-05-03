@@ -13,7 +13,7 @@ const { getDb } = require('./database/init');
 const app = express();
 const PORT = process.env.PORT || 3001;
 
-// Render/Cloudflare proxy
+// Proxy (Render/Cloudflare)
 app.set('trust proxy', 1);
 
 // Segurança
@@ -34,21 +34,14 @@ const allowedOrigins = [
 app.use(cors({
   origin: (origin, callback) => {
     if (!origin) return callback(null, true);
-
-    if (allowedOrigins.includes(origin)) {
-      return callback(null, true);
-    }
-
+    if (allowedOrigins.includes(origin)) return callback(null, true);
     return callback(new Error('CORS: Origin não permitida'), false);
   },
   credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
 }));
 
 // Middlewares
-app.use(express.json({ limit: '10kb' }));
-app.use(express.urlencoded({ extended: false, limit: '10kb' }));
+app.use(express.json());
 app.use(cookieParser());
 app.use(morgan(process.env.NODE_ENV === 'production' ? 'combined' : 'dev'));
 
@@ -61,93 +54,65 @@ try {
   process.exit(1);
 }
 
-// Criar admin automático
+// 🔥 Criar/Atualizar admin SEMPRE
 async function criarAdminPadrao() {
   try {
     const bcrypt = require('bcrypt');
     const db = getDb();
 
-    const existe = db
-      .prepare('SELECT * FROM users WHERE username = ?')
-      .get('william');
+    const username = 'william';
+    const password = '123456';
 
-    if (!existe) {
-      const senhaHash = await bcrypt.hash('123456', 10);
+    const hash = await bcrypt.hash(password, 10);
 
-      db.prepare('INSERT INTO users (username, password) VALUES (?, ?)')
-        .run('william', senhaHash);
+    const user = db.prepare(
+      'SELECT * FROM users WHERE username = ?'
+    ).get(username);
+
+    if (!user) {
+      db.prepare(
+        'INSERT INTO users (username, password) VALUES (?, ?)'
+      ).run(username, hash);
 
       console.log('👤 Admin criado: william / 123456');
     } else {
-      console.log('👤 Admin já existe');
+      db.prepare(
+        'UPDATE users SET password = ? WHERE username = ?'
+      ).run(hash, username);
+
+      console.log('👤 Admin atualizado: william / 123456');
     }
+
   } catch (err) {
     console.error('Erro ao criar admin:', err.message);
   }
 }
 
-// Rotas da API
+// Rotas
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/devices', require('./routes/devices'));
 app.use('/api/automations', require('./routes/automations'));
 app.use('/api/settings', require('./routes/settings'));
 
-// Health check
-app.get('/api/health', (req, res) => {
-  res.json({
-    status: 'ok',
-    timestamp: new Date().toISOString(),
-    version: '1.0.0',
-    name: process.env.PANEL_NAME || 'Painel Smart Home',
-  });
-});
-
-// Rota raiz
+// Teste API
 app.get('/', (req, res) => {
-  res.json({
-    success: true,
-    message: 'Painel Smart Home API online',
-  });
+  res.json({ success: true, message: 'API online' });
 });
-
-// Servir frontend só se existir
-if (process.env.NODE_ENV === 'production') {
-  const frontendDist = path.join(__dirname, '..', 'frontend', 'dist');
-  app.use(express.static(frontendDist));
-}
 
 // 404
 app.use((req, res) => {
-  res.status(404).json({ success: false, error: 'Rota não encontrada.' });
+  res.status(404).json({ success: false, error: 'Rota não encontrada' });
 });
 
-// Erro global
+// Erros
 app.use((err, req, res, next) => {
-  console.error('[ERROR]', err.message);
-
-  if (err.message === 'CORS: Origin não permitida') {
-    return res.status(403).json({ success: false, error: 'Acesso negado.' });
-  }
-
-  return res.status(500).json({
-    success: false,
-    error: process.env.NODE_ENV === 'production'
-      ? 'Erro interno do servidor.'
-      : err.message,
-  });
+  console.error(err.message);
+  res.status(500).json({ success: false, error: 'Erro interno' });
 });
 
-// Iniciar servidor
+// Start
 app.listen(PORT, async () => {
-  console.log('');
-  console.log('🏠 ================================');
-  console.log('   Painel Smart Home - Backend');
-  console.log('🏠 ================================');
-  console.log(`🚀 Servidor: http://localhost:${PORT}`);
-  console.log(`🌍 Ambiente: ${process.env.NODE_ENV || 'development'}`);
-  console.log(`🔑 Tuya API: ${process.env.TUYA_ACCESS_ID ? '✅ Configurada' : '❌ NÃO configurada'}`);
-  console.log('');
-
+  console.log(`🚀 Servidor rodando na porta ${PORT}`);
   await criarAdminPadrao();
 });
 
