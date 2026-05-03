@@ -84,15 +84,13 @@ async function criarAdminPadrao() {
 
     if (!user) {
       db.prepare(
-        'INSERT INTO users (username, password) VALUES (?, ?)'
-      ).run(username, hash);
 
+      ).run(username, hash, 'admin');
       console.log('👤 Admin criado: william / 123456');
     } else {
       db.prepare(
-        'UPDATE users SET password = ? WHERE username = ?'
-      ).run(hash, username);
-
+       'UPDATE users SET password_hash = ?, role = ? WHERE username = ?'
+      ).run(hash, 'admin', username);
       console.log('👤 Admin atualizado: william / 123456');
     }
 
