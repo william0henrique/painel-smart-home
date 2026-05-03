@@ -53,8 +53,8 @@ router.post(
       }
 
       // Verificar senha
-      const validPassword = await bcrypt.compare(password, user.password_hash);
-
+const hash = user.password_hash || user.password;
+const validPassword = await bcrypt.compare(password, hash);
       if (!validPassword) {
         logLoginAttempt(ip, username, false);
         return res.status(401).json({
