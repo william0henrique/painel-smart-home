@@ -9,7 +9,20 @@ const cookieParser = require('cookie-parser');
 const path = require('path');
 
 const { getDb } = require('./database/init');
+const fs = require('fs');
 
+if (process.env.RESET_DB === 'true') {
+  try {
+    const dbPath = require('path').join(__dirname, 'database.sqlite');
+
+    if (fs.existsSync(dbPath)) {
+      fs.unlinkSync(dbPath);
+      console.log('🔥 Banco deletado automaticamente');
+    }
+  } catch (err) {
+    console.error('Erro ao deletar banco:', err.message);
+  }
+}
 const app = express();
 const PORT = process.env.PORT || 3001;
 
