@@ -64,8 +64,9 @@ try {
 // Criar admin automático
 async function criarAdminPadrao() {
   try {
+    const bcrypt = require('bcrypt');
     const db = getDb();
-    const bcrypt = require('bcryptjs');
+
     const existe = db
       .prepare('SELECT * FROM users WHERE username = ?')
       .get('william');
@@ -73,7 +74,7 @@ async function criarAdminPadrao() {
     if (!existe) {
       const senhaHash = await bcrypt.hash('123456', 10);
 
-      db.prepare('INSERT INTO users (username, password_hash) VALUES (?, ?)')
+      db.prepare('INSERT INTO users (username, password) VALUES (?, ?)')
         .run('william', senhaHash);
 
       console.log('👤 Admin criado: william / 123456');
