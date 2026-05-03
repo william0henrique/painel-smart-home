@@ -2,7 +2,7 @@
 const axios = require('axios');
 const crypto = require('crypto');
 
-const BASE_URL = process.env.TUYA_BASE_URL || 'https://openapi.tuyabr1.com';
+const BASE_URL = process.env.TUYA_ENDPOINT || process.env.TUYA_BASE_URL || 'https://openapi.tuyaus.com';
 const CLIENT_ID = process.env.TUYA_CLIENT_ID;
 const CLIENT_SECRET = process.env.TUYA_CLIENT_SECRET;
 
